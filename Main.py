@@ -1,6 +1,5 @@
 import tkinter as tk
 import pandas as pd
-from numpy import isnan
 
 df = pd.read_excel("Skyhawk Primal Reformat.xls", 1, na_values = "")
 
@@ -34,10 +33,10 @@ class Translations:
         self.entry = tk.Entry(self.root, font=("Times New Roman", 14))
         self.entry.pack(pady=10)
 
-        translate_button = tk.Button(self.root, text="Translate", command=self.translate, font=("Times New Roman", 14))
+        translate_button = tk.Button(self.root, text="Translate", command=lambda: [self.clear_text(),self.translate()], font=("Times New Roman", 14))
         translate_button.pack(pady=10)
 
-        self.Exit = tk.Button(root, text="close tab", command=self.clear_text, font=("Times New Roman", 14))
+        self.Exit = tk.Button(root, text="Clear Tabs", command=self.clear_text, font=("Times New Roman", 14))
         self.Exit.pack(pady=10)
 
     def custom_font(self, message, highlight):
@@ -72,12 +71,9 @@ class Translations:
             self.text_box.insert('end', trickster_translation, "Times New Roman")
             self.text_box.insert('end', skyhawks_translation, "Times New Roman")
             self.text_box.insert('end', grammatical, "Times New Roman")
-            try:
-                if not isnan(grou[0]):
-                    grouping = f"\nit's in the following groups {grou}"
-                    self.text_box.insert('end', grouping, "Times New Roman")
-            except TypeError:
-                pass
+            grouping = f"\nit's in the following groups {grou}"
+            self.text_box.insert('end', grouping, "Times New Roman")
+
 
         start_index = self.text_box.index('end-1c')
         # text_box.insert('end', highlighted)
