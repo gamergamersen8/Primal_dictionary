@@ -6,7 +6,6 @@ if Path("Skyhawk Primal To English.csv").is_file() and Path("Skyhawk English To 
 else:
     sheet_one = pd.read_excel("Skyhawk Primal Reformat.xls", 0)
     sheet_two = pd.read_excel("Skyhawk Primal Reformat.xls", 1)
-    with open("Skyhawk Primal To English.csv", "w") as file:
-        sheet_one.to_csv(file)
-    with open("Skyhawk English To Primal.csv", "w") as file:
-        sheet_two.to_csv(file)
+    
+    sheet_one.to_csv("Skyhawk Primal To English.csv", encoding='utf-8', index=False)
+    sheet_two.to_csv("Skyhawk English To Primal.csv", encoding='utf-8', index=False)
