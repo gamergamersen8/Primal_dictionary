@@ -7,42 +7,107 @@
 #include <cstdio>
 #include <memory>
 #include <cstdlib>
-#include <stdio.h>
+#include <limits.h>
+using namespace std;
 
 #ifdef _WIN32
 #include <windows.h>
-#define PATH_MAX 4096
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    LPSTR lpCmdLine, int nCmdShow)
+{
+    WNDCLASSEX wc;
+    HWND hwnd;
+    MSG Msg;
+
+    //Step 1: Registering the Window Class
+    wc.cbSize        = sizeof(WNDCLASSEX);
+    wc.style         = 0;
+    wc.lpfnWndProc   = WndProc;
+    wc.cbClsExtra    = 0;
+    wc.cbWndExtra    = 0;
+    wc.hInstance     = hInstance;
+    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+    wc.lpszMenuName  = NULL;
+    wc.lpszClassName = g_szClassName;
+    wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
+
+    if(!RegisterClassEx(&wc))
+    {
+        MessageBox(NULL, "Window Registration Failed!", "Error!",
+            MB_ICONEXCLAMATION | MB_OK);
+        return 0;
+    }
+
+    // Step 2: Creating the Window
+    hwnd = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        g_szClassName,
+        "The title of my window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 240, 120,
+        NULL, NULL, hInstance, NULL);
+
+    if(hwnd == NULL)
+    {
+        MessageBox(NULL, "Window Creation Failed!", "Error!",
+            MB_ICONEXCLAMATION | MB_OK);
+        return 0;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    // Step 3: The Message Loop
+    while(GetMessage(&Msg, NULL, 0, 0) > 0)
+    {
+        TranslateMessage(&Msg);
+        DispatchMessage(&Msg);
+    }
+    return Msg.wParam;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            // All painting occurs here, between BeginPaint and EndPaint.
+
+            FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
+
+            EndPaint(hwnd, &ps);
+        }
+        return 0;
+
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
 #else
 #include <unistd.h>
-#include <limits.h>
 #endif
 
 #define forloop(len) for(int i = 0; i< len; i++)
 
-std::string GetFilePath() {
-    wchar_t result[PATH_MAX];
 
-#ifdef _WIN32
-    GetModuleFileName(NULL, result, PATH_MAX);
-    std::wstring ws(result);
-    std::string path(ws.begin(), ws.end());
-    size_t directory = path.find_last_of("\\/");
-    return path.substr(0, directory);
-
-#else
-    char result[PATH_MAX];
-    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-    if (count != -1) {
-        std::string path(result, count);
-        return path;
-    }
-    std::cerr << "Error: directory not found" << std::endl;
-    return "";
-#endif
-}
 
 bool PrintResult(std::vector<std::string>& matches) {
-    if (matches.size() == 1) {
+    #ifdef _WIN32
+
+    #endif
+
+    /*if (matches.size() == 1) {
         std::cout << "The translation is: " << matches[0] << std::endl;
         return true;
     }
@@ -57,20 +122,19 @@ bool PrintResult(std::vector<std::string>& matches) {
     else {
         std::cout << "Found no translation" << std::endl;
         return true;
-    }
+    }*/
 }
 
 std::string PingFiles() {
     try {
-        std::string directory = GetFilePath();
         std::ifstream EngPri("Skyhawk English To Primal.csv");
         std::ifstream PriEng("Skyhawk Primal To English.csv");
         if (!EngPri) {
-            std::cerr << "Failed to open file: Skyhawk English To Primal.csv" << std::endl;
+            std::cout << "Failed to open file: " << "Skyhawk English To Primal.csv" << std::endl;
             throw 56;
         }
         if (!PriEng) {
-            std::cerr << "Failed to open file: Skyhawk Primal To English.csv" << std::endl;
+            std::cout << "Failed to open file: " << "Skyhawk Primal To English.csv" << std::endl;
             throw 56;
         }
         return "Done";
@@ -79,20 +143,12 @@ std::string PingFiles() {
         printf("Unable to locate csv files\n");
         try {
             std::cout << "Running python script ... ";
-            std::string DirectoryPath = GetFilePath();
-            if (DirectoryPath.empty()) {
-                throw std::runtime_error("Unable to locate executable path");
-            }
-
-            std::string pythonPath = DirectoryPath + "/XlsxToCsv.py";
-            std::string fullPythonPath = "python3 " + pythonPath;
-
-            std::unique_ptr<FILE, int(*)(FILE*)> pipe(_popen(fullPythonPath.c_str(), "r"), _pclose);
+            const char* pythonPath = std::getenv("PYTHON_SCRIPT_PATH");
+            std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen("Python3 ./XlsxToCsv.py", "r"), _pclose);
             if (!pipe) {
-                std::cerr << "Error opening pipe" << std::endl;
-                throw std::runtime_error("Error opening pipe");
+                std::cerr << "Error" << std::endl;
+                throw "Error";
             }
-
             // Read the output of the Python script
             char buffer[128];
             std::string result;
@@ -102,8 +158,8 @@ std::string PingFiles() {
             std::cout << "Done" << std::endl;
             return result;
         }
-        catch (const std::exception& error) {
-            std::cout << "Unable to locate csv files and unable to run python script: " << error.what() << std::endl;
+        catch (std::string error) {
+            std::cout << "Unable to locate csv files and unable to run python script" << std::endl;
             exit(EXIT_FAILURE);
         }
     }
@@ -173,63 +229,21 @@ std::vector<std::string> PrimalToEnglish(const std::string& filename, const std:
     }
     return matches;
 }
-std::vector<std::string> EnglishToPrimal(const std::string& filename, const std::string& TBT) {
-    const int GrammaticalType_colom = 1;
-    const int Primal_colom = 2;
-    const int TricksterTransscription_colom = 4;
-    const int SkyhawkTransscription_colom = 5;
-    const int English_colom = 0;
-    auto data = readCSV(filename);
-    std::vector<std::string> matches;
-
-    bool perfectMatch = false;
-
-    for (const auto& row : data) {
-        if (row[Primal_colom] == TBT) {
-            perfectMatch = true;
-            matches.push_back(row[English_colom]);
-            PrintResult(matches);
-        }
-    }
-    if (!perfectMatch) {
-        for (const auto& row : data) {
-            if (row[Primal_colom].find(TBT) < row[Primal_colom].length()) {
-                matches.push_back(row[English_colom]);
-            }
-        }
-        PrintResult(matches);
-    }
-    return matches;
-}
 
 int main() {
     std::string re = PingFiles();
-    if (re.find("Error") != std::string::npos) {
-        std::cerr << "Error in running python script" << std::endl;
+    if (!re.find("Error")) {
+        std::cerr << "Error in running python script";
         std::cout << re << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    const std::string PTE = "Skyhawk Primal To English.csv";
-    const std::string ETP = "Skyhawk English To Primal.csv";
-
+    const std::string PTE = "Skyhawk English To Primal.csv";
     std::string TBT;
-    std::cout << "Translate to English or Primal? (E/P) ";
-    std::cin >> TBT;
-    if (TBT != "E") {
-        while (true) {
-            std::cout << "Input string to be translated to english: ";
-            std::cin >> TBT;
+    while (true) {
+        std::cout << "Input string to be translated to english: ";
+        std::cin >> TBT;
 
-            PrimalToEnglish(PTE, TBT);
-        }
-    }
-    else {
-        while (true) {
-            std::cout << "Input string to be translated to primal: ";
-            std::cin >> TBT;
-
-            EnglishToPrimal(PTE, TBT);
-        }
+        PrimalToEnglish(PTE, TBT);
     }
 }
