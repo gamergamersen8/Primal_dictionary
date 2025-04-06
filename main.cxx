@@ -8,121 +8,114 @@
 #include <memory>
 #include <cstdlib>
 #include <limits.h>
+#include <thread>
+#include <chrono>
 using namespace std;
-
-#ifdef _WIN32
-#include <windows.h>
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow)
-{
-    WNDCLASSEX wc;
-    HWND hwnd;
-    MSG Msg;
-
-    //Step 1: Registering the Window Class
-    wc.cbSize        = sizeof(WNDCLASSEX);
-    wc.style         = 0;
-    wc.lpfnWndProc   = WndProc;
-    wc.cbClsExtra    = 0;
-    wc.cbWndExtra    = 0;
-    wc.hInstance     = hInstance;
-    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
-    wc.lpszMenuName  = NULL;
-    wc.lpszClassName = g_szClassName;
-    wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
-
-    if(!RegisterClassEx(&wc))
-    {
-        MessageBox(NULL, "Window Registration Failed!", "Error!",
-            MB_ICONEXCLAMATION | MB_OK);
-        return 0;
-    }
-
-    // Step 2: Creating the Window
-    hwnd = CreateWindowEx(
-        WS_EX_CLIENTEDGE,
-        g_szClassName,
-        "The title of my window",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 240, 120,
-        NULL, NULL, hInstance, NULL);
-
-    if(hwnd == NULL)
-    {
-        MessageBox(NULL, "Window Creation Failed!", "Error!",
-            MB_ICONEXCLAMATION | MB_OK);
-        return 0;
-    }
-
-    ShowWindow(hwnd, nCmdShow);
-    UpdateWindow(hwnd);
-
-    // Step 3: The Message Loop
-    while(GetMessage(&Msg, NULL, 0, 0) > 0)
-    {
-        TranslateMessage(&Msg);
-        DispatchMessage(&Msg);
-    }
-    return Msg.wParam;
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    switch (uMsg)
-    {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-
-            // All painting occurs here, between BeginPaint and EndPaint.
-
-            FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
-
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-
-    }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-#else
-#include <unistd.h>
-#endif
 
 #define forloop(len) for(int i = 0; i< len; i++)
 
+#ifdef _WIN32
+#include <windows.h>
+class Window {
+private:
+    HANDLE hPipe;
+public:
+    Window() : hPipe(INVALID_HANDLE_VALUE) {}
+    bool WindowMain() {
+        Sleep(15);
 
+        hPipe = CreateFile(
+            TEXT("\\\\.\\pipe\\PrimalDictionary"),
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
 
-bool PrintResult(std::vector<std::string>& matches) {
-    #ifdef _WIN32
+        if (hPipe == INVALID_HANDLE_VALUE) {
+            std::cerr << "Could not open pipe. GLE=" << GetLastError() << std::endl;
+            return FALSE;
+        }
+        CloseHandle(hPipe);
+        return TRUE;
+    }
+    std::string WindowIn(bool& pipeOpen) {
+        if (!pipeOpen) {
+            return "Pipe is not available";
+        }
+        char buffer[128];
+        DWORD bytesRead;
+        DWORD bytesAvailable;
+        while (PeekNamedPipe(hPipe, NULL, 0, NULL, &bytesAvailable, NULL)) {
+        }
+        if (ReadFile(hPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL)) {
+            buffer[bytesRead] = '\0';
+            return std::string(buffer);
+        }
+    }
+    bool WindowOut(std::vector<std::string>& message) {
+        DWORD BytesWritten;
+        for (std::string match : message) {
+            bool success = WriteFile(hPipe, match.c_str(), static_cast<DWORD>(match.length()), &BytesWritten, NULL);
 
-    #endif
-
-    /*if (matches.size() == 1) {
-        std::cout << "The translation is: " << matches[0] << std::endl;
+            if (!success) {
+                std::cerr << "Error in writing to pipe" << std::endl;
+                return false;
+            }
+        }
         return true;
     }
-    else if (matches.size() > 1) {
-        std::cout << "Possible translations: ";
-        forloop(matches.size()) {
-            std::cout << "\n" << matches[i];
+    void ClosePipe() {
+        if (hPipe != INVALID_HANDLE_VALUE) {
+            CloseHandle(hPipe);
+            hPipe = INVALID_HANDLE_VALUE;
         }
-        std::cout << std::endl;
-        return true;
+    }
+    ~Window() {
+        ClosePipe();
+    }
+};
+#endif
+
+bool PrintResult(std::vector<std::string>&matches, bool& pipeOpen) {
+    if (pipeOpen) {
+        Window window;
+        bool result = window.WindowOut(matches);
+
+        return result;
     }
     else {
-        std::cout << "Found no translation" << std::endl;
-        return true;
-    }*/
+        if (matches.size() == 1) {
+            std::cout << "The translation is: " << matches[0] << std::endl;
+            return true;
+        }
+        else if (matches.size() > 1) {
+            std::cout << "Possible translations: ";
+            forloop(matches.size()) {
+                std::cout << "\n" << matches[i];
+            }
+            std::cout << std::endl;
+            return true;
+        }
+        else {
+            std::cout << "Found no translation" << std::endl;
+            return true;
+        }
+    }
+}
+
+std::string readIn(bool& pipeOpen) {
+    if (pipeOpen) {
+        Window window;
+        std::string read = window.WindowIn(pipeOpen);
+        return read;
+    }
+    else {
+        std::string read = "";
+        std::cin >> read;
+        return read;
+    }
 }
 
 std::string PingFiles() {
@@ -143,7 +136,6 @@ std::string PingFiles() {
         printf("Unable to locate csv files\n");
         try {
             std::cout << "Running python script ... ";
-            const char* pythonPath = std::getenv("PYTHON_SCRIPT_PATH");
             std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen("Python3 ./XlsxToCsv.py", "r"), _pclose);
             if (!pipe) {
                 std::cerr << "Error" << std::endl;
@@ -160,7 +152,7 @@ std::string PingFiles() {
         }
         catch (std::string error) {
             std::cout << "Unable to locate csv files and unable to run python script" << std::endl;
-            exit(EXIT_FAILURE);
+            return "Error";
         }
     }
 }
@@ -200,7 +192,7 @@ std::vector<std::vector<std::string>> readCSV(const std::string& filename) {
     return data;
 }
 
-std::vector<std::string> PrimalToEnglish(const std::string& filename, const std::string& TBT) {
+std::vector<std::string> PrimalToEnglish(const std::string& filename, const std::string& TBT, bool& pipeOpen) {
     const int GrammaticalType_colom = 1;
     const int Primal_colom = 2;
     const int TricksterTransscription_colom = 3;
@@ -215,7 +207,7 @@ std::vector<std::string> PrimalToEnglish(const std::string& filename, const std:
         if (row[Primal_colom] == TBT) {
             perfectMatch = true;
             matches.push_back(row[English_colom]);
-            PrintResult(matches);
+            PrintResult(matches, pipeOpen);
         }
     }
     if (!perfectMatch) {
@@ -225,25 +217,38 @@ std::vector<std::string> PrimalToEnglish(const std::string& filename, const std:
             }
         }
         std::cout << matches.size();
-        PrintResult(matches);
+        PrintResult(matches, pipeOpen);
     }
     return matches;
 }
 
 int main() {
+    Window window;
+    bool window_status = window.WindowMain();
+    if (!window_status) {
+        std::cout << "Unable to connect to c# file \n";
+        bool pipeOpen = FALSE;
+    }
+    else {
+        bool pipeOpen = TRUE;
+    }
+    bool pipeOpen = FALSE;
+
     std::string re = PingFiles();
     if (!re.find("Error")) {
         std::cerr << "Error in running python script";
         std::cout << re << std::endl;
-        exit(EXIT_FAILURE);
+        std::vector<std::string> errorVec;
+        errorVec.push_back("Error check existence of csv and python files");
+        PrintResult(errorVec, pipeOpen);
     }
 
     const std::string PTE = "Skyhawk English To Primal.csv";
     std::string TBT;
     while (true) {
         std::cout << "Input string to be translated to english: ";
-        std::cin >> TBT;
+        TBT = window.WindowIn(pipeOpen);
 
-        PrimalToEnglish(PTE, TBT);
+        PrimalToEnglish(PTE, TBT, pipeOpen);
     }
 }
