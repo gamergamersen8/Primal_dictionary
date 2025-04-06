@@ -5,13 +5,10 @@ from matplotlib import font_manager
 from sys import platform
 
 if platform == 'linux' or platform == 'linux2':
-    print("running on linux")
     fontpath = "usr/share/fonts"
 elif platform == 'darwin':
-    print("running on apple os")
     fontpath = "System/Library/AssetsV2"
 elif platform == 'win32':
-    print("running on windows")
     fontpath = "C:\\Windows\\Fonts"
 else:
     print("unable to locate operating system")
