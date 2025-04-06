@@ -5,9 +5,13 @@ This is the dictionary for the constructed language Primal created by Trickster.
 
 This is to be use as a learning resource alongside those gathered by Skyhawk here: https://drive.google.com/drive/u/0/folders/1ZZSTmk-vP8bgne08j_ajIfp0eGVJhuoq.
 
+
+
 Python Version
 
 For this you need a python compiler and then just have the xls file in the same folder as the python script
+
+
 
 C++ Version
 
