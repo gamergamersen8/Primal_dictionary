@@ -6,6 +6,9 @@ This is the dictionary for the constructed language Primal created by Trickster.
 This is to be use as a learning resource alongside those gathered by Skyhawk here: https://drive.google.com/drive/u/0/folders/1ZZSTmk-vP8bgne08j_ajIfp0eGVJhuoq.
 
 
+Use:
+First
+Install the Primalf.ttf and run it to create the font required for the programs
 
 Python Version
 
